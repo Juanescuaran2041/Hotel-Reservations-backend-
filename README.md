@@ -94,6 +94,24 @@ Design decisions:
 - Invoice numbers come from the `InvoiceNumberGenerator` singleton and are resumed from the database at startup.
   This is correct for a single instance; with several instances use a database sequence.
 
+One manual step after the first boot: Flyway holds a lock on its own history table while migrating, so enable RLS on it
+once from the Supabase SQL editor:
+
+```sql
+alter table public.flyway_schema_history enable row level security;
+```
+
+## Continuous deployment
+
+Every push to `main` runs `.github/workflows/deploy.yml`: tests, then build and push the image to ECR, restart the
+container through SSM and wait until the API answers. GitHub authenticates to AWS with OIDC (role
+`hotel-github-backend-deploy`, assumable only from `main` of this repository), so no AWS keys are stored in GitHub.
+Repository variables used: `AWS_REGION`, `AWS_ROLE_ARN`, `SITE_URL`. Roles are created once with
+`AWS_PROFILE=hotel GITHUB_OWNER=<user> ./deploy/aws/setup-github-deploy.sh`. The frontend repository deploys itself
+the same way. Configuration changes (database password, CORS) still go through `deploy/aws/redeploy.sh --config-only`.
+
+The hotel time zone (`hotel.timezone`, default `America/Bogota`) decides what "today" means for check-in validation.
+
 ## Design patterns
 
 ### Facade — `hotel/facade/HotelFacade`
