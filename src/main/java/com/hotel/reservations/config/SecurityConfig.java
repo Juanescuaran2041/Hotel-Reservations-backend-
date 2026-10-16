@@ -69,7 +69,7 @@ public class SecurityConfig {
     }
 
     @Bean
-    public Clock clock() {
-        return Clock.systemDefaultZone();
+    public Clock clock(HotelProperties hotelProperties) {
+        return Clock.system(hotelProperties.timezone());
     }
 }

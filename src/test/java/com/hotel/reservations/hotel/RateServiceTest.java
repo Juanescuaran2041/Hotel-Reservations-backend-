@@ -22,7 +22,7 @@ import com.hotel.reservations.hotel.util.InvoiceNumberGenerator;
 class RateServiceTest {
 
     private final RateService rateService = new RateService(
-            new SeasonCalendar(new HotelProperties(null)),
+            new SeasonCalendar(new HotelProperties(null, null)),
             new PricingStrategyFactory(List.of(new HighSeasonPricingStrategy(), new LowSeasonPricingStrategy())));
 
     @Test

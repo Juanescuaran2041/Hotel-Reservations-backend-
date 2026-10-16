@@ -34,6 +34,7 @@ spring:
 
 hotel:
   high-season-months: 6,7,12,1
+  timezone: America/Bogota
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:3000}
   security:
