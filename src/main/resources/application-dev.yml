@@ -1,4 +1,14 @@
-# Local development only. Never use this profile or this secret in production.
+# Local development and tests only. Never use this profile or this secret in production.
+spring:
+  datasource:
+    # In-memory H2 so no external database is needed. State is lost when the app stops.
+    url: jdbc:h2:mem:hotel;MODE=PostgreSQL;DB_CLOSE_DELAY=-1
+    username: sa
+    password: ""
+  flyway:
+    # V2 uses PostgreSQL-only features (exclusion constraint, RLS), so H2 stops at V1.
+    target: "1"
+
 hotel:
   security:
     jwt:
