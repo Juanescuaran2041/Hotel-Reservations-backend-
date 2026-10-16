@@ -23,4 +23,6 @@ alter table reservation_services   enable row level security;
 alter table invoices               enable row level security;
 alter table invoice_room_lines     enable row level security;
 alter table invoice_service_lines  enable row level security;
-alter table flyway_schema_history  enable row level security;
+
+-- flyway_schema_history cannot be altered here: Flyway holds a lock on it while this migration runs.
+-- Enable RLS on it once, from the Supabase SQL editor (see README).
