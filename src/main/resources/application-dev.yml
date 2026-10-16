@@ -1,0 +1,5 @@
+# Local development only. Never use this profile or this secret in production.
+hotel:
+  security:
+    jwt:
+      secret: dev-only-secret-change-me-0123456789abcdef
