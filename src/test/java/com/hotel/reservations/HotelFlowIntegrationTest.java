@@ -15,13 +15,15 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hotel.reservations.auth.repository.UserRepository;
 
-@SpringBootTest(properties = "hotel.security.jwt.secret=test-secret-with-more-than-32-characters!!")
+@SpringBootTest
+@ActiveProfiles("dev")
 @AutoConfigureMockMvc
 class HotelFlowIntegrationTest {
 
@@ -46,7 +48,7 @@ class HotelFlowIntegrationTest {
         String email = register();
 
         assertThat(userRepository.findByEmail(email)).get()
-                .satisfies(user -> assertThat(user.passwordHash()).startsWith("$2").isNotEqualTo(PASSWORD));
+                .satisfies(user -> assertThat(user.getPasswordHash()).startsWith("$2").isNotEqualTo(PASSWORD));
     }
 
     @Test
