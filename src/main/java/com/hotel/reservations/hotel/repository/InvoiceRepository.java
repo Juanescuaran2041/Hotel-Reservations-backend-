@@ -3,11 +3,12 @@ package com.hotel.reservations.hotel.repository;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.springframework.data.jpa.repository.JpaRepository;
+
 import com.hotel.reservations.hotel.model.Invoice;
 
-public interface InvoiceRepository {
+public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
 
-    Invoice save(Invoice invoice);
-
-    Optional<Invoice> findByReservationId(UUID reservationId);
+    /** Highest invoice number issued so far; used to resume the numbering after a restart. */
+    Optional<Invoice> findTopByOrderByNumberDesc();
 }

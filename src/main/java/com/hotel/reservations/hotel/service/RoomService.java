@@ -1,18 +1,20 @@
 package com.hotel.reservations.hotel.service;
 
 import java.time.LocalDate;
-import java.util.Comparator;
 import java.util.List;
-import java.util.UUID;
 
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.hotel.reservations.common.exception.BusinessRuleException;
 import com.hotel.reservations.hotel.model.Room;
 import com.hotel.reservations.hotel.model.RoomType;
 import com.hotel.reservations.hotel.repository.RoomRepository;
 
-/** Subsystem: room availability, reservation and release. */
+/**
+ * Subsystem: room availability. A room is held by the active reservation that covers the dates, so reserving
+ * means saving a reservation and releasing means checking it out; there is no separate room state to keep in sync.
+ */
 @Service
 public class RoomService {
 
@@ -23,24 +25,17 @@ public class RoomService {
     }
 
     /** Lists the rooms free for the whole stay; a null type means "any type". */
+    @Transactional(readOnly = true)
     public List<Room> findAvailable(RoomType type, LocalDate from, LocalDate to) {
-        List<Room> candidates = type == null ? roomRepository.findAll() : roomRepository.findByType(type);
-        return candidates.stream()
-                .filter(room -> room.isAvailable(from, to))
-                .sorted(Comparator.comparing(Room::getNumber))
-                .toList();
+        return type == null ? roomRepository.findAvailable(from, to) : roomRepository.findAvailableByType(type, from, to);
     }
 
-    /** Books the first free room of the requested type. Safe under concurrent requests. */
-    public Room reserve(RoomType type, LocalDate from, LocalDate to, UUID reservationId) {
-        return roomRepository.findByType(type).stream()
-                .filter(room -> room.book(reservationId, from, to))
+    /** Picks the first free room of the requested type. */
+    @Transactional(readOnly = true)
+    public Room findFirstAvailable(RoomType type, LocalDate from, LocalDate to) {
+        return roomRepository.findAvailableByType(type, from, to).stream()
                 .findFirst()
                 .orElseThrow(() -> new BusinessRuleException(
                         "No %s room is available between %s and %s".formatted(type, from, to)));
-    }
-
-    public void release(Room room, UUID reservationId) {
-        room.release(reservationId);
     }
 }

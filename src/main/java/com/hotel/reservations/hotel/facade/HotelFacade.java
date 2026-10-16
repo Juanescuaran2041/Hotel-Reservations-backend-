@@ -6,7 +6,9 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.hotel.reservations.auth.security.UserPrincipal;
 import com.hotel.reservations.common.exception.AccessDeniedBusinessException;
@@ -66,6 +68,7 @@ public class HotelFacade {
     }
 
     /** Lists free rooms for the dates, each with its dynamic price; a null type means any type. */
+    @Transactional(readOnly = true)
     public AvailabilityResponse checkAvailability(RoomType type, LocalDate checkIn, LocalDate checkOut) {
         validateStay(checkIn, checkOut);
         List<AvailableRoomResponse> rooms = roomService.findAvailable(type, checkIn, checkOut).stream()
@@ -74,60 +77,60 @@ public class HotelFacade {
         return new AvailabilityResponse(checkIn, checkOut, ChronoUnit.DAYS.between(checkIn, checkOut), rooms);
     }
 
-    /** Prices the stay, books a room of the requested type and stores the reservation. */
+    /** Prices the stay, picks a free room of the requested type and stores the reservation. */
+    @Transactional
     public ReservationResponse createReservation(CreateReservationRequest request, UserPrincipal user) {
         validateStay(request.checkInDate(), request.checkOutDate());
         RateQuote quote = rateService.calculate(request.roomType(), request.checkInDate(), request.checkOutDate());
-        UUID reservationId = UUID.randomUUID();
-        Room room = roomService.reserve(request.roomType(), request.checkInDate(), request.checkOutDate(),
-                reservationId);
+        Room room = roomService.findFirstAvailable(request.roomType(), request.checkInDate(), request.checkOutDate());
 
         Guest guest = new Guest(request.guestName().trim(), request.guestEmail().trim(), request.guestPhone());
-        Reservation reservation = new Reservation(reservationId, user.email(), guest, room,
+        Reservation reservation = new Reservation(UUID.randomUUID(), user.email(), guest, room,
                 request.checkInDate(), request.checkOutDate(), quote);
-        reservationRepository.save(reservation);
+        try {
+            // Flushing here makes the database exclusion constraint reject a room taken by a concurrent request.
+            reservationRepository.saveAndFlush(reservation);
+        } catch (DataIntegrityViolationException ex) {
+            throw new BusinessRuleException("The room was just taken by another reservation, please try again");
+        }
         return mapper.toResponse(reservation, null);
     }
 
+    @Transactional
     public ReservationResponse addService(UUID reservationId, AdditionalServiceType type, UserPrincipal user) {
         Reservation reservation = loadAuthorized(reservationId, user);
-        synchronized (reservation) {
-            additionalServiceService.addService(reservation, type);
-            return mapper.toResponse(reservation, null);
-        }
+        additionalServiceService.addService(reservation, type);
+        return mapper.toResponse(reservation, null);
     }
 
     /** Marks the guest as arrived and issues the digital room key. */
+    @Transactional
     public ReservationResponse checkIn(UUID reservationId, UserPrincipal user) {
         Reservation reservation = loadAuthorized(reservationId, user);
-        synchronized (reservation) {
-            if (reservation.getStatus() != ReservationStatus.CONFIRMED) {
-                throw new BusinessRuleException("Check-in requires a CONFIRMED reservation but it is "
-                        + reservation.getStatus());
-            }
-            reservation.setDigitalKey(accessService.issueKey(reservation));
-            reservation.setStatus(ReservationStatus.CHECKED_IN);
-            return mapper.toResponse(reservation, null);
+        if (reservation.getStatus() != ReservationStatus.CONFIRMED) {
+            throw new BusinessRuleException("Check-in requires a CONFIRMED reservation but it is "
+                    + reservation.getStatus());
         }
+        reservation.setDigitalKey(accessService.issueKey(reservation));
+        reservation.setStatus(ReservationStatus.CHECKED_IN);
+        return mapper.toResponse(reservation, null);
     }
 
-    /** Closes the stay: revokes the key, frees the room and issues the final invoice. */
+    /** Closes the stay: revokes the key, frees the room (by leaving the active states) and issues the invoice. */
+    @Transactional
     public ReservationResponse checkOut(UUID reservationId, UserPrincipal user) {
         Reservation reservation = loadAuthorized(reservationId, user);
-        synchronized (reservation) {
-            if (reservation.getStatus() != ReservationStatus.CHECKED_IN) {
-                throw new BusinessRuleException("Check-out requires a CHECKED_IN reservation but it is "
-                        + reservation.getStatus());
-            }
-            accessService.revokeKey(reservation.getDigitalKey());
-            reservation.setDigitalKey(null);
-            roomService.release(reservation.getRoom(), reservation.getId());
-            reservation.setStatus(ReservationStatus.CHECKED_OUT);
-            Invoice invoice = billingService.generateInvoice(reservation);
-            return mapper.toResponse(reservation, invoice);
+        if (reservation.getStatus() != ReservationStatus.CHECKED_IN) {
+            throw new BusinessRuleException("Check-out requires a CHECKED_IN reservation but it is "
+                    + reservation.getStatus());
         }
+        reservation.setDigitalKey(null);
+        reservation.setStatus(ReservationStatus.CHECKED_OUT);
+        Invoice invoice = billingService.generateInvoice(reservation);
+        return mapper.toResponse(reservation, invoice);
     }
 
+    @Transactional(readOnly = true)
     public ReservationResponse getReservation(UUID reservationId, UserPrincipal user) {
         Reservation reservation = loadAuthorized(reservationId, user);
         Invoice invoice = billingService.findByReservationId(reservationId).orElse(null);

@@ -1,34 +1,30 @@
 package com.hotel.reservations.hotel.service;
 
 import java.time.Instant;
-import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 import org.springframework.stereotype.Service;
 
 import com.hotel.reservations.hotel.model.DigitalKey;
 import com.hotel.reservations.hotel.model.Reservation;
+import com.hotel.reservations.hotel.model.ReservationStatus;
+import com.hotel.reservations.hotel.repository.ReservationRepository;
 
-/** Subsystem: simulated digital room keys. */
+/** Subsystem: simulated digital room keys. A key is valid exactly while its reservation is checked in. */
 @Service
 public class AccessService {
 
-    private final Map<String, DigitalKey> activeKeys = new ConcurrentHashMap<>();
+    private final ReservationRepository reservationRepository;
 
-    public DigitalKey issueKey(Reservation reservation) {
-        DigitalKey key = new DigitalKey(UUID.randomUUID().toString(), reservation.getRoom().getNumber(), Instant.now());
-        activeKeys.put(key.code(), key);
-        return key;
+    public AccessService(ReservationRepository reservationRepository) {
+        this.reservationRepository = reservationRepository;
     }
 
-    public void revokeKey(DigitalKey key) {
-        if (key != null) {
-            activeKeys.remove(key.code());
-        }
+    public DigitalKey issueKey(Reservation reservation) {
+        return new DigitalKey(UUID.randomUUID().toString(), reservation.getRoom().getNumber(), Instant.now());
     }
 
     public boolean isValid(String code) {
-        return activeKeys.containsKey(code);
+        return reservationRepository.existsByDigitalKeyCodeAndStatus(code, ReservationStatus.CHECKED_IN);
     }
 }

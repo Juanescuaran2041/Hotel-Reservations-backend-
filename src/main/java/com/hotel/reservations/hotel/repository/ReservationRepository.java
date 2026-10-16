@@ -1,13 +1,13 @@
 package com.hotel.reservations.hotel.repository;
 
-import java.util.Optional;
 import java.util.UUID;
 
+import org.springframework.data.jpa.repository.JpaRepository;
+
 import com.hotel.reservations.hotel.model.Reservation;
+import com.hotel.reservations.hotel.model.ReservationStatus;
 
-public interface ReservationRepository {
+public interface ReservationRepository extends JpaRepository<Reservation, UUID> {
 
-    Reservation save(Reservation reservation);
-
-    Optional<Reservation> findById(UUID id);
+    boolean existsByDigitalKeyCodeAndStatus(String digitalKeyCode, ReservationStatus status);
 }

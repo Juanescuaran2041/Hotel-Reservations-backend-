@@ -48,6 +48,6 @@ public class BillingService {
     }
 
     public Optional<Invoice> findByReservationId(UUID reservationId) {
-        return invoiceRepository.findByReservationId(reservationId);
+        return invoiceRepository.findById(reservationId);
     }
 }
