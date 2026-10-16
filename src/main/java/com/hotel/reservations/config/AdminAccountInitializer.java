@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 
 import com.hotel.reservations.auth.model.Role;
 import com.hotel.reservations.auth.service.AuthService;
+import com.hotel.reservations.common.exception.BusinessRuleException;
 
 /**
  * Creates an administrator at startup, only when both ADMIN_EMAIL and ADMIN_PASSWORD are provided.
@@ -36,7 +37,12 @@ public class AdminAccountInitializer implements ApplicationRunner {
         if (adminEmail.isBlank() || adminPassword.isBlank()) {
             return;
         }
-        authService.createUser("Administrator", adminEmail, adminPassword, Role.ADMIN);
-        log.info("Administrator account created for {}", adminEmail);
+        try {
+            authService.createUser("Administrator", adminEmail, adminPassword, Role.ADMIN);
+            log.info("Administrator account created for {}", adminEmail);
+        } catch (BusinessRuleException ex) {
+            // The database keeps accounts across restarts, so the admin normally exists already.
+            log.info("Administrator account for {} already exists", adminEmail);
+        }
     }
 }

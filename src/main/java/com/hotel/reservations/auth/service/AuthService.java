@@ -3,6 +3,7 @@ package com.hotel.reservations.auth.service;
 import java.util.Locale;
 import java.util.UUID;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -22,6 +23,7 @@ import com.hotel.reservations.common.exception.BusinessRuleException;
 public class AuthService {
 
     private static final String INVALID_CREDENTIALS = "Invalid email or password";
+    private static final String EMAIL_TAKEN = "An account with this email already exists";
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -42,17 +44,23 @@ public class AuthService {
 
     /** Creates an account with an explicit role; used by registration and by the optional admin bootstrap. */
     public User createUser(String fullName, String email, String rawPassword, Role role) {
-        User user = new User(UUID.randomUUID(), fullName.trim(), normalize(email),
-                passwordEncoder.encode(rawPassword), role);
-        if (!userRepository.saveIfAbsent(user)) {
-            throw new BusinessRuleException("An account with this email already exists");
+        String normalizedEmail = normalize(email);
+        if (userRepository.existsByEmail(normalizedEmail)) {
+            throw new BusinessRuleException(EMAIL_TAKEN);
         }
-        return user;
+        User user = new User(UUID.randomUUID(), fullName.trim(), normalizedEmail,
+                passwordEncoder.encode(rawPassword), role);
+        try {
+            return userRepository.saveAndFlush(user);
+        } catch (DataIntegrityViolationException ex) {
+            // Two concurrent registrations with the same email: the unique constraint decides.
+            throw new BusinessRuleException(EMAIL_TAKEN);
+        }
     }
 
     public TokenResponse login(LoginRequest request) {
         User user = userRepository.findByEmail(normalize(request.email())).orElse(null);
-        boolean matches = passwordEncoder.matches(request.password(), user == null ? decoyHash : user.passwordHash());
+        boolean matches = passwordEncoder.matches(request.password(), user == null ? decoyHash : user.getPasswordHash());
         if (user == null || !matches) {
             throw new AuthenticationFailedException(INVALID_CREDENTIALS);
         }
