@@ -11,16 +11,16 @@
 | Project | Hotel reservation system — **backend only** (frontend lives in another repo) |
 | Stack | Java 21, Spring Boot 3.5.13, Maven, Spring Security, JJWT 0.12 |
 | Base path | `/api/v1` |
-| State | In memory (Java collections), as required by the workshop |
+| State | PostgreSQL on Supabase (JPA + Flyway). H2 in memory for the `dev` profile and tests |
 | Language rule | **All code, comments, JSON fields and docs identifiers in English** (only the 6 route names inherited from the workshop are Spanish) |
 | Build / test | `mvn test` · run locally with `mvn spring-boot:run -Dspring-boot.run.profiles=dev` |
-| Required env in prod | `JWT_SECRET` (>= 32 chars), optional `CORS_ALLOWED_ORIGINS`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `PORT` |
+| Required env in prod | `JWT_SECRET` (>= 32 chars), `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`; optional `CORS_ALLOWED_ORIGINS`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `PORT` |
 
 ## 1. Architecture rules (do not break)
 
 1. Controllers call **only** `HotelFacade` (hotel) or `AuthService` (auth). Never a subsystem service.
 2. Subsystem services (`RoomService`, `RateService`, `AdditionalServiceService`, `BillingService`, `AccessService`) do **not** know each other; only the facade orchestrates them.
-3. Persistence goes through repository interfaces (`*Repository`); in-memory implementations are `InMemory*Repository`.
+3. Persistence goes through Spring Data repository interfaces (`*Repository`). The schema changes only through new Flyway migrations (never edit an applied one); Hibernate runs in `validate` mode.
 4. Money is always `BigDecimal` with scale 2. Never `double`.
 5. Errors are thrown as exceptions from `common.exception` and rendered by `GlobalExceptionHandler` as RFC 7807 problem JSON.
 6. Secrets never in source control. Passwords only stored as BCrypt hashes.
@@ -67,6 +67,14 @@ Legend: `[x]` done · `[ ]` pending
 - [x] **T-22 README** — setup, endpoints, security notes and documented design patterns.
 - [x] **T-23 Dockerfile** for Railway/any container host.
 
+### 2.5.1 Database (Supabase)
+
+- [x] **T-31 JPA entities + Flyway** — `V1` schema with seed rooms, `V2` PostgreSQL overlap constraint and RLS.
+- [x] **T-32 Concurrency safety** — exclusion constraint against overbooking, optimistic locking on reservations.
+- [x] **T-33 Configuration in SSM** — `/hotel/env/*` parameters become the container environment.
+- [ ] **T-34 First production boot against Supabase** — needs the database password in `deploy/aws/secrets.env`, then `./deploy/aws/redeploy.sh`.
+- [ ] **T-35 Review Supabase advisors** after the first boot (security: RLS on all tables incl. `flyway_schema_history`).
+
 ### 2.6 Pending / next steps (not done yet)
 
 - [ ] **T-24 Deploy backend to PROD** (Railway or similar) — set `JWT_SECRET` and `CORS_ALLOWED_ORIGINS` (Vercel URL). *Required by the workshop (note 2), needs the student's account.*
@@ -75,7 +83,6 @@ Legend: `[x]` done · `[ ]` pending
 - [ ] **T-27 Login rate limiting** (e.g. Bucket4j) against brute force.
 - [ ] **T-28 Cancel reservation** endpoint (`DELETE`/`PUT cancel`) using `RoomService.release`.
 - [ ] **T-29 OpenAPI/Swagger** documentation.
-- [ ] **T-30 Persistent storage** (JPA + PostgreSQL) — replace the `InMemory*Repository` classes; the interfaces already isolate this change.
 
 ## 3. Definition of done for any new task
 
