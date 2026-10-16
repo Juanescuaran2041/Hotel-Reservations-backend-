@@ -22,6 +22,11 @@ public final class InvoiceNumberGenerator {
         return Holder.INSTANCE;
     }
 
+    /** Makes sure the next number is greater than every number already stored (called at startup). */
+    public void resumeAfter(long lastIssuedSequence) {
+        sequence.accumulateAndGet(lastIssuedSequence, Math::max);
+    }
+
     public String next() {
         return "INV-%d-%06d".formatted(Year.now().getValue(), sequence.incrementAndGet());
     }
