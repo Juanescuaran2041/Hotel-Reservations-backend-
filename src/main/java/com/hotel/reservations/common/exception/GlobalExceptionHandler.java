@@ -6,6 +6,7 @@ import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -30,6 +31,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(BusinessRuleException.class)
     public ProblemDetail handleBusinessRule(BusinessRuleException ex) {
         return problem(HttpStatus.CONFLICT, "Business rule violated", ex.getMessage());
+    }
+
+    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+    public ProblemDetail handleConcurrentUpdate(ObjectOptimisticLockingFailureException ex) {
+        return problem(HttpStatus.CONFLICT, "Concurrent update",
+                "The reservation was modified by another request, please retry");
     }
 
     @ExceptionHandler(InvalidRequestException.class)
